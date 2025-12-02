@@ -1,0 +1,15 @@
+# Virtual environment
+venv/
+*.pyc
+__pycache__/venv/
+
+# Virtual environment
+venv/
+.env
+# Ignorar todos los datos pesados
+data/*
+!data/acceso_data.py
+outputs/
+# Archivos temporales de Python
+*.pyc
+__pycache__/
