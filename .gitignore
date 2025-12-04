@@ -9,7 +9,14 @@ venv/
 # Ignorar todos los datos pesados
 data/*
 !data/acceso_data.py
-outputs/
+outputs/*
 # Archivos temporales de Python
 *.pyc
 __pycache__/
+# Datos pesados
+*.h5
+*.parquet
+*.npy
+*.npz
+*.csv    # si son muy pesados
+data/*

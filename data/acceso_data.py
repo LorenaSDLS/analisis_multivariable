@@ -19,12 +19,15 @@ def cargar_numericos():
     precipitacion_anual["CVEGEO"] = precipitacion_anual["CVEGEO"].apply(normalizar_cvegeo)
     return precipitacion_anual, temperatura_anual, unidades_clima
 
-def cargar_series_tiempo():
-    series_tiempo = pd.read_parquet('data/series_tiempo/mun_series_tiempo.parquet')
-    series_tiempo["CVEGEO"] = series_tiempo["CVEGEO"].apply(normalizar_cvegeo)
-    return series_tiempo
+def cargar_mensuales():
+    radiacion = pd.read_parquet('data/series_tiempo/Radiacion_municipal.parquet')
+    radiacion["CVEGEO"] = radiacion["CVEGEO"].apply(normalizar_cvegeo)
+    sequia = pd.read_parquet('data/series_tiempo/Sequia_mensual_completa.parquet')
+    sequia["CVEGEO"] = sequia["CVEGEO"].apply(normalizar_cvegeo)
+    return radiacion, sequia
 
 def cargar_municipios():
     municipios = pd.read_parquet('data/tabla_municipios.parquet')
     municipios["CVEGEO"] = municipios["CVEGEO"].apply(normalizar_cvegeo)
     return municipios
+

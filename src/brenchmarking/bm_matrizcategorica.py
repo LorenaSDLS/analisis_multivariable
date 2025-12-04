@@ -1,11 +1,11 @@
 #python3 -m src.brenchmarking.bm_matrizcategorica
 import time
+import h5py
 import numpy as np
 from data.acceso_data import cargar_categoricos
 from src.construccion_matriz.matriz_categorica import construir_matriz_categorica
 from src.utils.helpers import Progreso
 from src.utils.rendimiento import * 
-import time
 import psutil
 from src.utils.helpers import Progreso
 uso_cpu = psutil.cpu_percent(interval=1, percpu=False)
@@ -35,7 +35,13 @@ def main():
     tiempo_total = fin - inicio
 
     # === GUARDAR MATRIZ ===
-    np.save("outputs/matriz_categorica.npy", matriz)
+    # === GUARDAR MATRIZ ===
+    with h5py.File("outputs/matriz_categorica.h5", "w") as f:
+        f.create_dataset("matriz", data=matriz)
+        # Convertir CVEGEO a bytes para HDF5
+        lista_bytes = np.array(lista_cvegeo, dtype="S5")
+        f.create_dataset("cvegeo", data=lista_bytes)
+
 
     # === MEDIR MEMORIA Y CPU FINAL ===
     proceso = psutil.Process()
