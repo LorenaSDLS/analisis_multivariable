@@ -47,7 +47,7 @@ def main():
     benchmark_matriz_mensual(
         nombre="radiación",
         parquet="data/series_tiempo/Radiacion_municipal_limpia.parquet",
-        salida_h5="outputs/matriz_radiacion.h5",
+        salida_h5="outputs/matriz_sim_radiacion.h5",
         normalizar=True
     )
 

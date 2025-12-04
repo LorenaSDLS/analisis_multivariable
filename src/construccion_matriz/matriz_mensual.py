@@ -17,7 +17,8 @@ def calcular_bloque(args):
     for i in range(start_i, end_i):
         fila = np.zeros(n, dtype=np.float32)
         for j in range(i, n):  # triángulo superior
-            fila[j] = np.linalg.norm(data[i] - data[j])
+            dist = np.linalg.norm(data[i] - data[j])
+            fila[j] = 1 / (1 + dist)
         bloque.append((i, fila))
 
     return bloque
