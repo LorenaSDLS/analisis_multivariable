@@ -9,3 +9,4 @@ tqdm
 scipy==1.12.0
 python-Levenshtein
 joblib
+networkx

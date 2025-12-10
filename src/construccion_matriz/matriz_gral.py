@@ -1,134 +1,121 @@
+"""
+Construye matriz de similitud general a partir de varias matrices cuadradas (2475x2475)
+usando un promedio ponderado.
+
+Cada archivo H5 debe contener:
+- dataset: "matriz"   (float64, cuadrada)
+- dataset: "cvegeo"   (lista de municipios en el mismo orden)
+
+CONFIGURA:
+    ARCHIVOS_MATRICES
+    PESOS
+    RUTA_SALIDA
+"""
+
 import h5py
+import pandas as pd
 import numpy as np
-from sklearn.preprocessing import MinMaxScaler
 
 
-# ============================================================
-# Función para cargar matriz y CVEGEO desde un archivo .h5
-# ============================================================
+# ------------------------------------------------------------
+# 1. Leer matriz desde archivo H5
+# ------------------------------------------------------------
 
-# ============================================================
-# Construcción de matriz general de similitud
-# ============================================================
-def cargar_matriz_y_cvegeo(path):
+def cargar_matriz(path):
     """
-    Carga la matriz y cvegeo desde un archivo HDF5,
-    detectando automáticamente el nombre correcto de los datasets.
+    Devuelve DataFrame con filas y columnas = cvegeo.
     """
-    import h5py
-    import numpy as np
-
     with h5py.File(path, "r") as f:
-        keys = list(f.keys())
-        print(f"[INFO] Leyendo {path} — datasets: {keys}")
+        matriz = f["matriz"][:]                # (2475 x 2475)
+        cvegeo = [c.decode("utf-8") for c in f["cvegeo"][:]]
 
-        # -------- Buscar dataset de matriz --------
-        if "matriz" in keys:
-            matriz = f["matriz"][:]
-        elif "similitud" in keys:
-            matriz = f["similitud"][:]
-        else:
-            raise KeyError(
-                f"ERROR: No se encontró dataset de matriz en {path}. "
-                "Se esperaba uno de: ['matriz', 'similitud']"
-            )
-
-        # -------- Buscar dataset de CVEGEO --------
-        if "cvegeo" in keys:
-            cvegeo = f["cvegeo"][:]
-        elif "municipios" in keys:
-            cvegeo = f["municipios"][:]
-        else:
-            raise KeyError(
-                f"ERROR: No se encontró dataset de CVEGEO en {path}. "
-                "Se esperaba uno de: ['cvegeo', 'municipios']"
-            )
-
-    return matriz, cvegeo
-
-def matriz_similitud_general(paths, pesos, salida_h5):
-
-    if len(paths) != len(pesos):
-        raise ValueError("Error: paths y pesos deben tener el mismo largo")
-
-    # Normalizar pesos a suma = 1
-    pesos = np.array(pesos, dtype=np.float32)
-    pesos = pesos / pesos.sum()
-
-    # ---------------------------------
-    # Cargar primera matriz para iniciar
-    # ---------------------------------
-    matriz0, cvegeo = cargar_matriz_y_cvegeo(paths[0])
-    n = matriz0.shape[0]
-
-    print(f"→ Cargando matriz base: {paths[0]}  |  Tamaño: {n} x {n}")
-
-    matriz_final = matriz0 * pesos[0]
-
-    # ---------------------------------
-    # Acumular cada matriz ponderada
-    # ---------------------------------
-    for path, w in zip(paths[1:], pesos[1:]):
-        print(f"→ Sumando matriz: {path}  | peso = {w}")
-        M, cve = cargar_matriz_y_cvegeo(path)
-
-        if M.shape != matriz_final.shape:
-            raise ValueError(f"Dimensiones incompatibles: {path}")
-
-        matriz_final += M * w
-
-        # Verificar que CVEGEO coincida
-        if not np.array_equal(cvegeo, cve):
-            print("⚠ Advertencia: Los CVEGEO no son idénticos entre matrices")
-
-    print("→ Matrices sumadas correctamente.")
-
-    # ---------------------------------
-    # Normalizar la matriz 0–1
-    # ---------------------------------
-    print("→ Normalizando matriz final…")
-    scaler = MinMaxScaler()
-    matriz_flat = matriz_final.reshape(-1, 1)
-    matriz_norm = scaler.fit_transform(matriz_flat).reshape(n, n)
-
-    # ---------------------------------
-    # Convertir distancia → similitud
-    # ---------------------------------
-    matriz_sim = 1 - matriz_norm
-
-    # ---------------------------------
-    # Guardar archivo final
-    # ---------------------------------
-    with h5py.File(salida_h5, "w") as f:
-        f.create_dataset("matriz", data=matriz_sim.astype(np.float32), compression="gzip")
-        f.create_dataset("cvegeo", data=np.array(cvegeo, dtype="S"), compression="gzip")
-
-    print("\n✔ MATRIZ FINAL GUARDADA")
-    print("Archivo:", salida_h5)
-    print("Dimensiones:", matriz_sim.shape)
-    print("Similitud min/max:", matriz_sim.min(), matriz_sim.max())
-
-    return matriz_sim, cvegeo
+    df = pd.DataFrame(matriz, index=cvegeo, columns=cvegeo)
+    return df
 
 
+# ------------------------------------------------------------
+# 2. Alinear matrices al mismo orden (por si acaso)
+# ------------------------------------------------------------
+
+def alinear_matriz(df, orden):
+    """
+    Reordena filas y columnas según `orden`.
+    """
+    return df.loc[orden, orden]
 
 
-# ============================================================
-# EJEMPLO: LLAMADA PRINCIPAL (puedes editar este bloque)
-# ============================================================
+# ------------------------------------------------------------
+# 3. Construir matriz general con pesos
+# ------------------------------------------------------------
+
+def construir_matriz_general(matrices, pesos):
+    """
+    matrices: lista de DataFrames cuadradas
+    pesos: lista de floats (suma = 1)
+    """
+    assert len(matrices) == len(pesos), "Debe haber un peso por matriz."
+
+    # Asegurar suma 1
+    suma = sum(pesos)
+    pesos = [p / suma for p in pesos]
+
+    matriz_final = np.zeros_like(matrices[0].values)
+
+    for df, w in zip(matrices, pesos):
+        matriz_final += w * df.values
+
+    # Convertir nuevamente a DataFrame
+    cvegeo = matrices[0].index.tolist()
+    return pd.DataFrame(matriz_final, index=cvegeo, columns=cvegeo)
+
+
+# ------------------------------------------------------------
+# 4. Guardar resultado en H5
+# ------------------------------------------------------------
+
+def guardar_h5(df, path_salida):
+    cvegeo = df.index.astype(str).tolist()
+    arr_cvegeo = np.array(cvegeo, dtype="S5")  # guardar como bytes
+    matriz = df.values.astype("float64")
+
+    with h5py.File(path_salida, "w") as f:
+        f.create_dataset("cvegeo", data=arr_cvegeo)
+        f.create_dataset("matriz", data=matriz)
+
+    print(f"[OK] Matriz guardada en: {path_salida}")
+
+
+# ------------------------------------------------------------
+# 5. MAIN
+# ------------------------------------------------------------
+
 if __name__ == "__main__":
 
-    # Rutas de tus matrices individuales
-    paths = [
+    # ================== CONFIGURA AQUÍ =======================
+    ARCHIVOS_MATRICES = [
         "outputs/matriz_categorica.h5",
         "outputs/matriz_numerica.h5",
+        "outputs/matriz_precipitacion.h5",
         "outputs/matriz_sequia.h5"
     ]
 
-    # Pesos para cada matriz (puedes cambiarlos)
+    PESOS = [0.25, 0.25, 0.25, 0.25]   # asignar peso a cada matriz
 
+    RUTA_SALIDA = "outputs/matriz_sim_general.h5"
+    # ===========================================================
 
-    # Archivo de salida
-    salida = "outputs/matriz_similitud_general.h5"
+    print("[INFO] Cargando matrices...")
 
-    matriz, cvegeo = matriz_similitud_general(paths, salida)
+    matrices = [cargar_matriz(p) for p in ARCHIVOS_MATRICES]
+
+    # Asegurar mismo orden
+    orden = matrices[0].index.tolist()
+    matrices = [alinear_matriz(df, orden) for df in matrices]
+
+    print("[INFO] Construyendo matriz general...")
+    matriz_general = construir_matriz_general(matrices, PESOS)
+
+    print("[INFO] Guardando archivo...")
+    guardar_h5(matriz_general, RUTA_SALIDA)
+
+    print("[DONE] Matriz general construida exitosamente.")
